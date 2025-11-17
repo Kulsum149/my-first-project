@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>To-Do App — Prompt Modes</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --glass-bg: rgba(255,255,255,0.10);
+      --glass-item: rgba(255,255,255,0.20);
+    }
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #6d28d9, #3b82f6);
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      color: #fff;
+    }
+
+    .container {
+      width: 420px;
+      padding: 22px;
+      border-radius: 18px;
+      backdrop-filter: blur(28px);
+      background: var(--glass-bg);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+      animation: fadeIn .5s ease-out;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+    header { display:flex; justify-content:space-between; align-items:center; }
+
+    h2 { margin: 0; font-weight:600; font-size:20px; }
+
+    .controls {
+      margin-top:12px;
+      display:flex;
+      gap:8px;
+    }
+    .controls input {
+      flex:1;
+      padding:10px 12px;
+      border-radius:12px;
+      border:none;
+      outline:none;
+    }
+    .controls button {
+      border:none;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .primary { background:#4f46e5; color:#fff; padding:10px 12px; }
+    .small { background:rgba(255,255,255,0.06); padding:10px 8px; }
+
+    .tool-row { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .tool-row button {
+      padding:8px 10px;
+      border-radius:10px;
+      border:none;
+      background:rgba(255,255,255,0.06);
+      cursor:pointer;
+      color:#fff;
+    }
+
+    ul {
+      margin-top:16px;
+      padding:0;
+      list-style:none;
+      max-height:320px;
+      overflow:auto;
+    }
+
+    li {
+      background:var(--glass-item);
+      padding:12px;
+      margin-bottom:12px;
+      border-radius:12px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      animation: fadeInItem .36s forwards;
+      opacity:0;
+      transform:translateY(10px);
+    }
+    @keyframes fadeInItem { to{opacity:1;transform:none} }
+
+    .left { display:flex; gap:10px; align-items:center; flex:1; }
+
+    .text { font-size:14px; }
+
+    li.completed .text {
+      text-decoration:line-through;
+      color:#22c55e;
+    }
+
+    .actions button {
+      background:transparent;
+      border:none;
+      color:inherit;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .edit { color:#a7f3d0; }
+    .delete { color:#fca5a5; }
+
+    .fade-out { animation: fadeOut .32s forwards; }
+    @keyframes fadeOut { to{opacity:0;transform:translateY(-8px);} }
+
+    .hint { font-size:12px; opacity:0.9; margin-top:6px; }
+
+    .suggestions { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+
+    /* Suggestion pills animation */
+    @keyframes suggFadeIn {
+      0% { opacity: 0; transform: translateY(6px) scale(0.96); }
+      100% { opacity: 1; transform: none; }
+    }
+
+    .suggest-pill {
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.10);
+      cursor:pointer;
+      font-size:13px;
+      opacity:0;
+      animation: suggFadeIn 0.35s ease forwards;
+    }
+
+    .status {
+      margin-top:10px;
+      font-size:12px;
+      opacity:0.9;
+      height:14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h2>✨ To-Do List</h2>
+      <div style="font-size:12px;opacity:0.9">Auto saved</div>
+    </header>
+
+    <div class="controls">
+      <input id="taskInput" type="text" placeholder="Enter task..." />
+      <button class="primary" id="addBtn">Add</button>
+      <button class="small" id="promptBtn">Prompt</button>
+    </div>
+
+    <div class="tool-row">
+      <button id="voiceBtn">🎤 Voice</button>
+      <button id="suggestBtn">✨ Suggest</button>
+      <button id="placeholderBtn">⚙️ Placeholder</button>
+      <button id="clearAllBtn">🗑️ Clear</button>
+    </div>
+
+    <div class="hint">Click suggestions to add them.</div>
+    <div id="suggestionsRow" class="suggestions"></div>
+
+    <ul id="taskList"></ul>
+
+    <div id="statusLine" class="status"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('taskInput');
+    const addBtn = document.getElementById('addBtn');
+    const promptBtn = document.getElementById('promptBtn');
+    const voiceBtn = document.getElementById('voiceBtn');
+    const suggestBtn = document.getElementById('suggestBtn');
+    const placeholderBtn = document.getElementById('placeholderBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const suggestionsRow = document.getElementById('suggestionsRow');
+    const taskList = document.getElementById('taskList');
+    const statusLine = document.getElementById('statusLine');
+
+    const suggestionPool = [
+      "Buy groceries", "Finish assignment", "Read 20 pages",
+      "Practice Angular", "Clean workspace", "Call Mom",
+      "Pay bills", "Backup files", "Prepare meals",
+      "Plan tomorrow", "Stretch for 5 mins", "Drink water"
+    ];
+
+    function status(msg){
+      statusLine.innerText = msg;
+      clearTimeout(status._t);
+      status._t = setTimeout(()=> statusLine.innerText='', 2000);
+    }
+
+    function saveToStorage(){
+      const tasks = [...taskList.querySelectorAll("li")].map(li => ({
+        text: li.querySelector(".text").innerText,
+        completed: li.classList.contains("completed")
+      }));
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+      status("Saved");
+    }
+
+    function loadTasks(){
+      const saved = JSON.parse(localStorage.getItem('tasks')) || [];
+      saved.forEach(t => taskList.appendChild(createTaskElement(t.text, t.completed)));
+    }
+
+    function createTaskElement(text, completed){
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="left">
+          <input type="checkbox" class="check">
+          <span class="text">${text}</span>
+        </div>
+        <div class="actions">
+          <button class="edit">Edit</button>
+          <button class="delete">Delete</button>
+        </div>
+      `;
+
+      const chk = li.querySelector(".check");
+      const txt = li.querySelector(".text");
+      const editBtn = li.querySelector(".edit");
+      const deleteBtn = li.querySelector(".delete");
+
+      if(completed){
+        li.classList.add("completed");
+        chk.checked = true;
+      }
+
+      chk.addEventListener("change", () => {
+        li.classList.toggle("completed", chk.checked);
+        saveToStorage();
+      });
+
+      editBtn.addEventListener("click", () => {
+        if(editBtn.innerText === "Edit"){
+          txt.outerHTML = `<input class="edit-input" value="${txt.innerText}">`;
+          editBtn.innerText = "Save";
+        } else {
+          const inputEl = li.querySelector(".edit-input");
+          inputEl.outerHTML = `<span class="text">${inputEl.value}</span>`;
+          editBtn.innerText = "Edit";
+          saveToStorage();
+        }
+      });
+
+      deleteBtn.addEventListener("click", () => {
+        li.classList.add("fade-out");
+        setTimeout(() => { li.remove(); saveToStorage(); }, 300);
+      });
+
+      return li;
+    }
+
+    function addTask(){
+      if(!input.value.trim()) return;
+      taskList.appendChild(createTaskElement(input.value, false));
+      input.value = "";
+      saveToStorage();
+    }
+
+    addBtn.addEventListener("click", addTask);
+    input.addEventListener("keydown", e => { if(e.key === "Enter") addTask(); });
+
+    promptBtn.addEventListener("click", () => {
+      const res = prompt("Enter task:");
+      if(res && res.trim()) {
+        taskList.appendChild(createTaskElement(res.trim(), false));
+        saveToStorage();
+      }
+    });
+
+    /* Voice Input */
+    let recognition = null;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if(SpeechRecognition){
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+
+      voiceBtn.onclick = () => { recognition.start(); status("Listening…"); };
+
+      recognition.onresult = e => {
+        const text = e.results[0][0].transcript;
+        taskList.appendChild(createTaskElement(text, false));
+        saveToStorage();
+      };
+
+    } else {
+      voiceBtn.onclick = () => status("Voice not supported");
+    }
+
+    /* Smart Suggestions */
+    suggestBtn.onclick = () => {
+      const q = input.value.toLowerCase();
+      suggestionsRow.innerHTML = "";
+
+      let results = suggestionPool.filter(s => s.toLowerCase().includes(q));
+      if(results.length === 0) results = suggestionPool.slice(0,3);
+
+      results.forEach((s, i) => {
+        const pill = document.createElement("div");
+        pill.className = "suggest-pill";
+        pill.innerText = s;
+
+        pill.style.animationDelay = (i * 0.07) + "s";
+
+        pill.onclick = () => {
+          taskList.appendChild(createTaskElement(s,false));
+          saveToStorage();
+          suggestionsRow.innerHTML = "";
+        };
+
+        suggestionsRow.appendChild(pill);
+      });
+    };
+
+    /* Placeholder custom */
+    placeholderBtn.onclick = () => {
+      const ph = prompt("Enter new placeholder:");
+      if(ph){
+        input.placeholder = ph;
+        localStorage.setItem("placeholder", ph);
+      }
+    };
+
+    /* Clear all */
+    clearAllBtn.onclick = () => {
+      if(confirm("Clear all tasks?")){
+        taskList.innerHTML = "";
+        saveToStorage();
+      }
+    };
+
+    if(localStorage.getItem("placeholder"))
+      input.placeholder = localStorage.getItem("placeholder");
+
+    loadTasks();
+  </script>
+
+</body>
+</html>
